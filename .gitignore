@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+saved_models/
+data/raw/
+*.h5
+*.joblib
+*.pkl
+*.pt
+*.bin
+*.safetensors

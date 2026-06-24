@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Phishing Email Detection System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=12">
+</head>
+<body>
+    <div class="page">
+        <div class="container">
+            <div class="hero">
+                <h1>Phishing Email Detection System</h1>
+                <p class="subtitle">
+                    NLP-based semester project prototype for real-time email classification
+                </p>
+            </div>
+
+            <div class="main-grid">
+                <div class="card">
+                    <form method="POST" id="detectForm">
+                        <div class="form-group">
+                            <label for="model">Select Model</label>
+                            <select name="model" id="model">
+                                {% for model in models %}
+                                <option value="{{ model }}" {% if selected_model == model %}selected{% endif %}>
+                                    {{ model|replace("_", " ")|title }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="samples">
+                            <span class="samples-title">Quick Samples:</span>
+                            <button type="button" class="sample-btn" onclick="fillPhishingSample()">Phishing Sample</button>
+                            <button type="button" class="sample-btn" onclick="fillLegitimateSample()">Legitimate Sample</button>
+                            <button type="button" class="sample-btn secondary" onclick="clearTextArea()">Clear</button>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="email_text">Email Text</label>
+                            <textarea
+                                name="email_text"
+                                id="email_text"
+                                rows="12"
+                                placeholder="Paste email content here..."
+                            >{{ email_text if email_text else "" }}</textarea>
+                        </div>
+
+                        <div class="actions">
+                            <button type="submit" class="detect-btn" id="detectBtn">Detect</button>
+                        </div>
+                    </form>
+
+                    {% if error %}
+                    <div class="alert error-alert">
+                        <strong>Error:</strong> {{ error }}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="card side-card">
+                    <h3>How it Works</h3>
+                    <ul class="feature-list">
+                        <li>Email text is preprocessed</li>
+                        <li>URLs and numbers are normalized</li>
+                        <li>TF-IDF / BoW / embeddings are generated</li>
+                        <li>Selected model predicts phishing or legitimate</li>
+                        <li>Each prediction is saved in PostgreSQL</li>
+                    </ul>
+
+                    <div class="tip-box">
+                        <h4>Phishing Signals</h4>
+                        <p>Urgent language, fake links, account suspension threats, identity verification requests, and suspicious wording.</p>
+                    </div>
+                </div>
+            </div>
+
+            {% if prediction %}
+            <div class="result-card {% if prediction|lower == 'phishing' %}phishing{% else %}legitimate{% endif %}">
+                <div class="result-header">
+                    <h2>Prediction Result</h2>
+                    <span class="result-badge {% if prediction|lower == 'phishing' %}badge-danger{% else %}badge-safe{% endif %}">
+                        {{ prediction }}
+                    </span>
+                </div>
+
+                <div class="final-decision">
+                    <span class="final-label">Final Decision</span>
+                    <span class="final-value {% if final_decision and final_decision|lower == 'phishing' %}final-danger{% else %}final-safe{% endif %}">
+                        {{ final_decision }}
+                    </span>
+                </div>
+
+                <div class="result-grid">
+                    <div class="result-item">
+                        <span class="label">Model</span>
+                        <span class="value model-badge">{{ selected_model|replace("_", " ")|title }}</span>
+                    </div>
+
+                    <div class="result-item">
+                        <span class="label">Prediction</span>
+                        <span class="value">{{ prediction }}</span>
+                    </div>
+
+                    <div class="result-item">
+                        <span class="label">Confidence</span>
+                        <span class="value">
+                            {% if confidence is not none %}
+                                {{ confidence }}
+                            {% else %}
+                                Not available for this model
+                            {% endif %}
+                        </span>
+
+                        {% if confidence is not none %}
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: {{ (confidence * 100)|round(2) }}%;"></div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="signals-box">
+                    <h4>Detected Signals</h4>
+                    {% if signals %}
+                    <div class="signals-list">
+                        {% for s in signals %}
+                        <span class="signal-chip">{{ s }}</span>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="no-signals">No obvious phishing keywords detected in raw input.</p>
+                    {% endif %}
+                </div>
+
+                <div class="clean-box">
+                    <h4>Preprocessed Text</h4>
+                    <p>{{ clean_text }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if model_summary %}
+            <div class="card summary-card">
+                <h2>Model Summary Graph</h2>
+                <div class="summary-grid">
+                    {% for model, stats in model_summary.items() %}
+                    <div class="summary-item">
+                        <h4>{{ model|replace("_", " ")|title }}</h4>
+                        <p>Total Tests: <strong>{{ stats.total }}</strong></p>
+                        <p>Phishing: <strong>{{ stats.phishing }}</strong></p>
+                        <p>Legitimate: <strong>{{ stats.legitimate }}</strong></p>
+
+                        <div class="bar-wrap">
+                            <div class="bar-label">Phishing</div>
+                            <div class="bar-bg">
+                                <div class="bar-fill bar-red" style="width: {{ (stats.phishing / stats.total * 100) if stats.total else 0 }}%;"></div>
+                            </div>
+                        </div>
+
+                        <div class="bar-wrap">
+                            <div class="bar-label">Legitimate</div>
+                            <div class="bar-bg">
+                                <div class="bar-fill bar-green" style="width: {{ (stats.legitimate / stats.total * 100) if stats.total else 0 }}%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if history %}
+            <div class="card history-card">
+                <h2>Prediction History Table</h2>
+                <div class="history-table-wrap">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Model</th>
+                                <th>Prediction</th>
+                                <th>Confidence</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in history %}
+                            <tr>
+                                <td>{{ row.id }}</td>
+                                <td>{{ row.model_used|replace("_", " ")|title }}</td>
+                                <td>
+                                    <span class="history-pill {% if row.prediction|lower == 'phishing' %}history-pill-danger{% else %}history-pill-safe{% endif %}">
+                                        {{ row.prediction }}
+                                    </span>
+                                </td>
+                                <td>{{ row.confidence }}</td>
+                                <td>{{ row.created_at }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById("detectForm");
+        const detectBtn = document.getElementById("detectBtn");
+        const emailText = document.getElementById("email_text");
+
+        if (form) {
+            form.addEventListener("submit", function () {
+                detectBtn.disabled = true;
+                detectBtn.innerText = "Detecting...";
+            });
+        }
+
+        function fillPhishingSample() {
+            emailText.value = `Dear Customer,
+
+We have detected unusual activity on your account. Your account will be suspended within 24 hours unless you verify your information immediately.
+
+Please click the link below to confirm your identity:
+http://secure-account-verification-login.com
+
+Failure to act may result in permanent account closure.
+
+Sincerely,
+Support Team`;
+        }
+
+        function fillLegitimateSample() {
+            emailText.value = `Hello Team,
+
+Please find attached the updated agenda for tomorrow's project review meeting.
+
+The meeting will start at 10:00 AM in Conference Room B.
+
+Regards,
+Project Manager`;
+        }
+
+        function clearTextArea() {
+            emailText.value = "";
+        }
+    </script>
+</body>
+</html>
